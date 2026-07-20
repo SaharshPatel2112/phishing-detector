@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-
+import { SiteHeader } from "@/components/site-header";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -63,7 +63,10 @@ export default function RootLayout({
       lang="en"
       className={`dark bg-background ${geistSans.variable} ${geistMono.variable} ${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans flex flex-col">{children}</body>
+      <body className="min-h-full font-sans flex flex-col">
+        <SiteHeader />
+        {children}
+      </body>
     </html>
   );
 }

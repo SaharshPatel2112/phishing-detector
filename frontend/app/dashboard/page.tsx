@@ -34,7 +34,7 @@ const riskStyles: Record<string, string> = {
   Safe: 'text-success bg-success/10 border-success/30',
 }
 
-export function DashboardPreview() {
+export default function Dashboard() {
   return (
     <section id="dashboard" className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
       <Reveal className="mx-auto max-w-2xl text-center">

@@ -32,7 +32,7 @@ const steps = [
   },
 ]
 
-export function HowItWorks() {
+export default function HowItWorks() {
   return (
     <section id="how-it-works" className="border-y border-border bg-card/30">
       <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">

@@ -82,7 +82,7 @@ export function Hero() {
         </motion.div>
 
         {/* Live URL scanner card */}
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
@@ -172,7 +172,7 @@ export function Hero() {
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.div>
+        </motion.div> */}
       </div>
     </section>
   )

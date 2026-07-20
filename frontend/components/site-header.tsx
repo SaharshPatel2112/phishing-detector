@@ -6,10 +6,9 @@ import { ShieldCheck, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const navLinks = [
-  { label: 'Features', href: '#features' },
-  { label: 'How it works', href: '#how-it-works' },
-  { label: 'Dashboard', href: '#dashboard' },
-  { label: 'Admin', href: '#admin' },
+  { label: 'Home', href: '/' },
+  { label: 'How it works', href: '/how-it-works' },
+  { label: 'Dashboard', href: '/dashboard' },
 ]
 
 export function SiteHeader() {
