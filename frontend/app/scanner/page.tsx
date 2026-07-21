@@ -1,0 +1,137 @@
+'use client'
+import { useState } from 'react'
+import { useAuth } from '@clerk/nextjs'
+import { Search, ShieldCheck, TrendingUp, ShieldAlert, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import Navbar from '../components/Navbar'
+
+const chartData = [
+  { day: 'Mon', threats: 0, scans: 0 },
+  { day: 'Tue', threats: 0, scans: 0 },
+  { day: 'Wed', threats: 0, scans: 0 },
+  { day: 'Thu', threats: 0, scans: 0 },
+  { day: 'Fri', threats: 0, scans: 0 },
+  { day: 'Sat', threats: 0, scans: 0 },
+  { day: 'Sun', threats: 0, scans: 0 },
+]
+
+const stats = [
+  { icon: TrendingUp, label: 'Scans this week', value: '0', tint: 'text-primary' },
+  { icon: ShieldAlert, label: 'Threats blocked', value: '0', tint: 'text-destructive' },
+  { icon: AlertTriangle, label: 'Pending review', value: '0', tint: 'text-warning' },
+  { icon: CheckCircle2, label: 'Marked safe', value: '0', tint: 'text-success' },
+]
+
+export default function Scanner() {
+  const { getToken } = useAuth()
+  const [url, setUrl] = useState('')
+  const [result, setResult] = useState<{ riskLevel: string; reason: string } | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  async function handleScan() {
+    setLoading(true)
+    setResult(null)
+    const token = await getToken()
+    const res = await fetch('http://localhost:5000/api/scan/url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ url }),
+    })
+    const data = await res.json()
+    setResult(data)
+    setLoading(false)
+  }
+
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      <Navbar />
+
+      <section
+        className="px-6 py-20"
+        style={{ background: 'radial-gradient(ellipse 60% 60% at 50% -10%, rgba(249,115,22,0.35), #09090b 70%)' }}
+      >
+        <div className="mx-auto max-w-2xl">
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+              <ShieldCheck size={16} className="text-primary" />
+              Live URL scanner
+            </div>
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text" value={url} onChange={(e) => setUrl(e.target.value)}
+                  placeholder="http://secure-paypal-login.verify-account.com"
+                  className="w-full rounded-lg border border-border bg-background py-3 pl-10 pr-4 text-foreground placeholder-muted-foreground outline-none focus:border-primary"
+                />
+              </div>
+              <button onClick={handleScan} disabled={loading || !url}
+                className="rounded-lg bg-primary px-6 py-3 font-medium text-white disabled:opacity-50">
+                {loading ? 'Scanning...' : 'Scan URL'}
+              </button>
+            </div>
+          </div>
+
+          {result && (
+            <div className="mt-6 rounded-lg border border-border bg-card p-4 text-left">
+              <p className="font-semibold">
+                Risk Level:{' '}
+                <span className={result.riskLevel === 'high' ? 'text-destructive' : result.riskLevel === 'medium' ? 'text-warning' : 'text-success'}>
+                  {result.riskLevel.toUpperCase()}
+                </span>
+              </p>
+              <p className="mt-1 text-muted-foreground">{result.reason}</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-5xl px-6 pb-24">
+        <div className="rounded-2xl border border-border bg-card/50 p-4 sm:p-6">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {stats.map(({ icon: Icon, label, value, tint }) => (
+              <div key={label} className="rounded-xl border border-border bg-background p-4">
+                <Icon className={`h-5 w-5 ${tint}`} />
+                <p className="mt-3 text-2xl font-bold">{value}</p>
+                <p className="text-xs text-muted-foreground">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-5">
+            <div className="rounded-xl border border-border bg-background p-4 lg:col-span-3">
+              <p className="mb-4 text-sm font-semibold">Detections over time</p>
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
+                    <defs>
+                      <linearGradient id="scans" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f97316" stopOpacity={0.5} />
+                        <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="threats" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ef4444" stopOpacity={0.5} />
+                        <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid horizontal vertical stroke="#27272a" />
+                    <XAxis dataKey="day" stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 12, color: '#fafafa', fontSize: 12 }} />
+                    <Area type="monotone" dataKey="scans" stroke="#f97316" strokeWidth={2} fill="url(#scans)" />
+                    <Area type="monotone" dataKey="threats" stroke="#ef4444" strokeWidth={2} fill="url(#threats)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-background p-4 lg:col-span-2">
+              <p className="mb-4 text-sm font-semibold">Recent scans</p>
+              <p className="text-sm text-muted-foreground">No scans saved yet.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}
