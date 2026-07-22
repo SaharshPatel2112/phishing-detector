@@ -1,10 +1,17 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import { clerkMiddleware, requireAuth, getAuth } from "@clerk/express";
+import {
+  clerkMiddleware,
+  requireAuth,
+  getAuth,
+  clerkClient,
+} from "@clerk/express";
 import { checkSafeBrowsing } from "./services/safeBrowsing.js";
 import { checkVirusTotal } from "./services/virusTotal.js";
 import { calculateRisk } from "./services/riskScore.js";
+import { getOrCreateUser } from "./services/users.js";
+import { supabase } from "./db.js";
 
 const app = express();
 app.use(cors());
@@ -17,12 +24,24 @@ app.post("/api/scan/url", requireAuth(), async (req, res) => {
   if (!url) return res.status(400).json({ error: "URL is required" });
 
   try {
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+    const user = await getOrCreateUser(userId, email);
+
     const [gsbResult, vtResult] = await Promise.all([
       checkSafeBrowsing(url),
       checkVirusTotal(url),
     ]);
     const risk = calculateRisk(gsbResult, vtResult);
-    // TODO next step: save this to scan_history using userId
+
+    await supabase.from("scan_history").insert({
+      user_id: user.id,
+      scan_type: "url",
+      content: url,
+      result: { gsbResult, vtResult },
+      risk_level: risk.level,
+    });
+
     res.json({ url, riskLevel: risk.level, reason: risk.reason });
   } catch (err) {
     console.error(err);
