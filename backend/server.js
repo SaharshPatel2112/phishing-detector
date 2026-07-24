@@ -12,6 +12,7 @@ import { checkVirusTotal } from "./services/virusTotal.js";
 import { calculateRisk } from "./services/riskScore.js";
 import { getOrCreateUser } from "./services/users.js";
 import { supabase } from "./db.js";
+import { getDashboardStats, getRecentScans } from "./services/stats.js";
 
 const app = express();
 app.use(cors());
@@ -47,6 +48,24 @@ app.post("/api/scan/url", requireAuth(), async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Scan failed" });
   }
+});
+
+app.get("/api/dashboard/stats", requireAuth(), async (req, res) => {
+  const { userId } = getAuth(req);
+  const clerkUser = await clerkClient.users.getUser(userId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+  const user = await getOrCreateUser(userId, email);
+  const stats = await getDashboardStats(user.id);
+  res.json(stats);
+});
+
+app.get("/api/dashboard/recent", requireAuth(), async (req, res) => {
+  const { userId } = getAuth(req);
+  const clerkUser = await clerkClient.users.getUser(userId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+  const user = await getOrCreateUser(userId, email);
+  const scans = await getRecentScans(user.id);
+  res.json(scans);
 });
 
 const PORT = process.env.PORT || 5000;
