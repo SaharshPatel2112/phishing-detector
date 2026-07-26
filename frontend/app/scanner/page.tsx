@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import {
   Search,
   ShieldCheck,
+  Mail,
   TrendingUp,
   ShieldAlert,
   AlertTriangle,
@@ -49,14 +50,42 @@ const riskColor: Record<string, string> = {
   low: "text-success bg-success/10 border-success/30",
 };
 
+function ScanIcon({ type }: { type: string }) {
+  const src = type === "url" ? "/url.svg" : "/email.svg";
+  return (
+    <div
+      className="h-4 w-4 shrink-0 bg-primary"
+      style={{
+        WebkitMaskImage: `url(${src})`,
+        maskImage: `url(${src})`,
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+      }}
+    />
+  );
+}
+
 export default function Scanner() {
   const { getToken } = useAuth();
+
   const [url, setUrl] = useState("");
-  const [result, setResult] = useState<{
+  const [urlResult, setUrlResult] = useState<{
     riskLevel: string;
     reason: string;
   } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [urlLoading, setUrlLoading] = useState(false);
+
+  const [emailContent, setEmailContent] = useState("");
+  const [emailResult, setEmailResult] = useState<{
+    riskLevel: string;
+    reason: string;
+  } | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+
   const [stats, setStats] = useState<Stats>({
     scansThisWeek: 0,
     threatsBlocked: 0,
@@ -68,12 +97,10 @@ export default function Scanner() {
   async function loadDashboard() {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
-
     const statsRes = await fetch("http://localhost:5000/api/dashboard/stats", {
       headers,
     });
     setStats(await statsRes.json());
-
     const recentRes = await fetch(
       "http://localhost:5000/api/dashboard/recent",
       { headers },
@@ -85,9 +112,9 @@ export default function Scanner() {
     loadDashboard();
   }, []);
 
-  async function handleScan() {
-    setLoading(true);
-    setResult(null);
+  async function handleScanUrl() {
+    setUrlLoading(true);
+    setUrlResult(null);
     const token = await getToken();
     const res = await fetch("http://localhost:5000/api/scan/url", {
       method: "POST",
@@ -97,10 +124,26 @@ export default function Scanner() {
       },
       body: JSON.stringify({ url }),
     });
-    const data = await res.json();
-    setResult(data);
-    setLoading(false);
-    loadDashboard(); // refresh stats after a new scan
+    setUrlResult(await res.json());
+    setUrlLoading(false);
+    loadDashboard();
+  }
+
+  async function handleAnalyzeEmail() {
+    setEmailLoading(true);
+    setEmailResult(null);
+    const token = await getToken();
+    const res = await fetch("http://localhost:5000/api/scan/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content: emailContent }),
+    });
+    setEmailResult(await res.json());
+    setEmailLoading(false);
+    loadDashboard();
   }
 
   const statCards = [
@@ -135,20 +178,20 @@ export default function Scanner() {
       <Navbar />
 
       <section
-        className="px-6 py-20"
+        className="px-8 py-16"
         style={{
           background:
             "radial-gradient(ellipse 60% 60% at 50% -10%, rgba(249,115,22,0.35), #09090b 70%)",
         }}
       >
-        <div className="mx-auto max-w-2xl">
-          <div className="rounded-2xl border border-border bg-card p-6">
-            <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-              <ShieldCheck size={16} className="text-primary" />
-              Live URL scanner
-            </div>
-            <div className="flex gap-3">
-              <div className="relative flex-1">
+        <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-6 lg:grid-cols-5">
+          <div className="flex flex-col gap-6 lg:col-span-2">
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <ShieldCheck size={16} className="text-primary" />
+                Live URL scanner
+              </div>
+              <div className="relative mb-3">
                 <Search
                   size={16}
                   className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -162,56 +205,99 @@ export default function Scanner() {
                 />
               </div>
               <button
-                onClick={handleScan}
-                disabled={loading || !url}
-                className="rounded-lg bg-primary px-6 py-3 font-medium text-white disabled:opacity-50"
+                onClick={handleScanUrl}
+                disabled={urlLoading || !url}
+                className="w-full rounded-lg bg-primary px-6 py-3 font-medium text-white disabled:opacity-50"
               >
-                {loading ? "Scanning..." : "Scan URL"}
+                {urlLoading ? "Scanning..." : "Scan URL"}
               </button>
+              {urlResult && (
+                <div className="mt-4 rounded-lg border border-border bg-background p-3 text-left">
+                  <p className="text-sm font-semibold">
+                    Risk:{" "}
+                    <span
+                      className={
+                        urlResult.riskLevel === "high"
+                          ? "text-destructive"
+                          : urlResult.riskLevel === "medium"
+                            ? "text-warning"
+                            : "text-success"
+                      }
+                    >
+                      {urlResult.riskLevel.toUpperCase()}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {urlResult.reason}
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
 
-          {result && (
-            <div className="mt-6 rounded-lg border border-border bg-card p-4 text-left">
-              <p className="font-semibold">
-                Risk Level:{" "}
-                <span
-                  className={
-                    result.riskLevel === "high"
-                      ? "text-destructive"
-                      : result.riskLevel === "medium"
-                        ? "text-warning"
-                        : "text-success"
-                  }
-                >
-                  {result.riskLevel.toUpperCase()}
-                </span>
-              </p>
-              <p className="mt-1 text-muted-foreground">{result.reason}</p>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-5xl px-6 pb-24">
-        <div className="rounded-2xl border border-border bg-card/50 p-4 sm:p-6">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {statCards.map(({ icon: Icon, label, value, tint }) => (
-              <div
-                key={label}
-                className="rounded-xl border border-border bg-background p-4"
-              >
-                <Icon className={`h-5 w-5 ${tint}`} />
-                <p className="mt-3 text-2xl font-bold">{value}</p>
-                <p className="text-xs text-muted-foreground">{label}</p>
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <Mail size={16} className="text-primary" />
+                Email content analyzer
               </div>
-            ))}
+              <textarea
+                value={emailContent}
+                onChange={(e) => setEmailContent(e.target.value)}
+                placeholder="Paste the email content here..."
+                rows={4}
+                className="mb-3 w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary"
+              />
+              <button
+                onClick={handleAnalyzeEmail}
+                disabled={emailLoading || !emailContent}
+                className="w-full rounded-lg bg-primary px-6 py-3 font-medium text-white disabled:opacity-50"
+              >
+                {emailLoading ? "Analyzing..." : "Analyze Email"}
+              </button>
+              {emailResult && (
+                <div className="mt-4 rounded-lg border border-border bg-background p-3 text-left">
+                  <p className="text-sm font-semibold">
+                    Risk:{" "}
+                    <span
+                      className={
+                        emailResult.riskLevel === "high"
+                          ? "text-destructive"
+                          : emailResult.riskLevel === "medium"
+                            ? "text-warning"
+                            : "text-success"
+                      }
+                    >
+                      {emailResult.riskLevel.toUpperCase()}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {emailResult.reason}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-5">
-            <div className="rounded-xl border border-border bg-background p-4 lg:col-span-3">
+          <div className="rounded-2xl border border-border bg-card/50 p-4 sm:p-6 lg:col-span-3">
+            <span className="text-sm font-semibold text-primary">
+              DASHBOARD
+            </span>
+
+            <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {statCards.map(({ icon: Icon, label, value, tint }) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-border bg-background p-4"
+                >
+                  <Icon className={`h-5 w-5 ${tint}`} />
+                  <p className="mt-3 text-2xl font-bold">{value}</p>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-border bg-background p-4">
               <p className="mb-4 text-sm font-semibold">Detections over time</p>
-              <div className="h-56 w-full">
+              <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={chartData}
@@ -285,7 +371,7 @@ export default function Scanner() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border bg-background p-4 lg:col-span-2">
+            <div className="mt-4 rounded-xl border border-border bg-background p-4">
               <p className="mb-4 text-sm font-semibold">Recent scans</p>
               {recentScans.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
@@ -294,11 +380,9 @@ export default function Scanner() {
               ) : (
                 <ul className="flex flex-col gap-3">
                   {recentScans.map((scan, i) => (
-                    <li
-                      key={i}
-                      className="flex items-center justify-between gap-3"
-                    >
-                      <p className="truncate text-xs">{scan.content}</p>
+                    <li key={i} className="flex items-center gap-3">
+                      <ScanIcon type={scan.scan_type} />
+                      <p className="flex-1 truncate text-xs">{scan.content}</p>
                       <span
                         className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${riskColor[scan.risk_level]}`}
                       >

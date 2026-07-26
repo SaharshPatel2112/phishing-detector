@@ -13,6 +13,7 @@ import { calculateRisk } from "./services/riskScore.js";
 import { getOrCreateUser } from "./services/users.js";
 import { supabase } from "./db.js";
 import { getDashboardStats, getRecentScans } from "./services/stats.js";
+import { analyzeEmail } from "./services/emailAnalyzer.js";
 
 const app = express();
 app.use(cors());
@@ -47,6 +48,34 @@ app.post("/api/scan/url", requireAuth(), async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Scan failed" });
+  }
+});
+
+app.post("/api/scan/email", requireAuth(), async (req, res) => {
+  const { content } = req.body;
+  const { userId } = getAuth(req);
+  if (!content)
+    return res.status(400).json({ error: "Email content is required" });
+
+  try {
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+    const user = await getOrCreateUser(userId, email);
+
+    const analysis = analyzeEmail(content);
+
+    await supabase.from("scan_history").insert({
+      user_id: user.id,
+      scan_type: "email",
+      content: content.slice(0, 500), // cap length before storing
+      result: { matched: analysis.matched },
+      risk_level: analysis.level,
+    });
+
+    res.json({ riskLevel: analysis.level, reason: analysis.reason });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Analysis failed" });
   }
 });
 
