@@ -33,6 +33,16 @@ type Scan = {
   risk_level: string;
   created_at: string;
 };
+type UrlResult = {
+  riskLevel: string;
+  reason: string;
+  sources?: {
+    googleSafeBrowsing: string;
+    virusTotal: string;
+    heuristics: string;
+  };
+};
+type EmailResult = { riskLevel: string; reason: string };
 
 const chartData = [
   { day: "Mon", threats: 0, scans: 0 },
@@ -73,17 +83,11 @@ export default function Scanner() {
   const { getToken } = useAuth();
 
   const [url, setUrl] = useState("");
-  const [urlResult, setUrlResult] = useState<{
-    riskLevel: string;
-    reason: string;
-  } | null>(null);
+  const [urlResult, setUrlResult] = useState<UrlResult | null>(null);
   const [urlLoading, setUrlLoading] = useState(false);
 
   const [emailContent, setEmailContent] = useState("");
-  const [emailResult, setEmailResult] = useState<{
-    riskLevel: string;
-    reason: string;
-  } | null>(null);
+  const [emailResult, setEmailResult] = useState<EmailResult | null>(null);
   const [emailLoading, setEmailLoading] = useState(false);
 
   const [stats, setStats] = useState<Stats>({
@@ -230,6 +234,28 @@ export default function Scanner() {
                   <p className="text-xs text-muted-foreground">
                     {urlResult.reason}
                   </p>
+                  {urlResult.sources && (
+                    <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2 text-xs text-muted-foreground">
+                      <p>
+                        Google Safe Browsing:{" "}
+                        <span className="text-foreground">
+                          {urlResult.sources.googleSafeBrowsing}
+                        </span>
+                      </p>
+                      <p>
+                        VirusTotal:{" "}
+                        <span className="text-foreground">
+                          {urlResult.sources.virusTotal}
+                        </span>
+                      </p>
+                      <p>
+                        Heuristics:{" "}
+                        <span className="text-foreground">
+                          {urlResult.sources.heuristics}
+                        </span>
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

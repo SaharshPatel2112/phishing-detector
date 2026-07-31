@@ -1,15 +1,12 @@
-import { supabase } from "../db.js";
-import { getAuth } from "@clerk/express";
+import { getAuth, clerkClient } from "@clerk/express";
+import { ADMIN_EMAILS } from "../config/admin.js";
 
 export async function requireAdmin(req, res, next) {
   const { userId } = getAuth(req);
-  const { data: user } = await supabase
-    .from("users")
-    .select("role")
-    .eq("clerk_user_id", userId)
-    .single();
+  const clerkUser = await clerkClient.users.getUser(userId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress?.toLowerCase() || "";
 
-  if (!user || user.role !== "admin") {
+  if (!ADMIN_EMAILS.includes(email)) {
     return res.status(403).json({ error: "Admin access required" });
   }
   next();

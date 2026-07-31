@@ -33,33 +33,38 @@ app.post("/api/scan/url", requireAuth(), async (req, res) => {
     const email = clerkUser.emailAddresses[0]?.emailAddress || "";
     const user = await getOrCreateUser(userId, email);
 
-    let riskLevel, reason, resultPayload;
+    let gsbResult,
+      vtResult,
+      fromCache = false;
     const cached = await getCachedUrlScan(url);
 
     if (cached) {
-      riskLevel = cached.risk_level;
-      reason = "Result from cache (already scanned in the last 24 hours)";
-      resultPayload = cached.result;
+      gsbResult = cached.result.gsbResult;
+      vtResult = cached.result.vtResult;
+      fromCache = true;
     } else {
-      const [gsbResult, vtResult] = await Promise.all([
+      [gsbResult, vtResult] = await Promise.all([
         checkSafeBrowsing(url),
         checkVirusTotal(url),
       ]);
-      const risk = calculateRisk(gsbResult, vtResult);
-      riskLevel = risk.level;
-      reason = risk.reason;
-      resultPayload = { gsbResult, vtResult };
     }
+
+    const risk = calculateRisk(gsbResult, vtResult, url);
 
     await supabase.from("scan_history").insert({
       user_id: user.id,
       scan_type: "url",
       content: url,
-      result: resultPayload,
-      risk_level: riskLevel,
+      result: { gsbResult, vtResult },
+      risk_level: risk.level,
     });
 
-    res.json({ url, riskLevel, reason });
+    res.json({
+      url,
+      riskLevel: risk.level,
+      reason: fromCache ? `${risk.reason} (cached result)` : risk.reason,
+      sources: risk.sources,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Scan failed" });

@@ -1,6 +1,5 @@
 import { supabase } from "../db.js";
-
-const ADMIN_EMAILS = ["1saharshpatel2112@gmail.com"];
+import { ADMIN_EMAILS } from "../config/admin.js";
 
 export async function getOrCreateUser(clerkUserId, email) {
   const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
