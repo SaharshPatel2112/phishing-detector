@@ -16,6 +16,7 @@ import { analyzeEmail } from "./services/emailAnalyzer.js";
 import { getKeywords, addKeyword, deleteKeyword } from "./services/keywords.js";
 import { requireAdmin } from "./middleware/requireAdmin.js";
 import { getCachedUrlScan } from "./services/cache.js";
+import { getReport } from "./services/reports.js";
 import { supabase } from "./db.js";
 
 const app = express();
@@ -87,7 +88,7 @@ app.post("/api/scan/email", requireAuth(), async (req, res) => {
     await supabase.from("scan_history").insert({
       user_id: user.id,
       scan_type: "email",
-      content: content.slice(0, 500),
+      content: content,
       result: { matched: analysis.matched },
       risk_level: analysis.level,
     });
@@ -113,6 +114,15 @@ app.get("/api/dashboard/recent", requireAuth(), async (req, res) => {
   const email = clerkUser.emailAddresses[0]?.emailAddress || "";
   const user = await getOrCreateUser(userId, email);
   res.json(await getRecentScans(user.id));
+});
+
+app.get("/api/reports", requireAuth(), async (req, res) => {
+  const { userId } = getAuth(req);
+  const clerkUser = await clerkClient.users.getUser(userId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+  const user = await getOrCreateUser(userId, email);
+  const { riskLevel, scanType, days } = req.query;
+  res.json(await getReport(user.id, { riskLevel, scanType, days }));
 });
 
 app.get(
