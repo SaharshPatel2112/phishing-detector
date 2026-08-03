@@ -22,6 +22,7 @@ export default function Navbar() {
   const links = [
     { href: "/", label: "Home" },
     { href: "/scanner", label: "Scanner" },
+    { href: "/reports", label: "Reports" },
     ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
@@ -41,11 +42,10 @@ export default function Navbar() {
             <Link
               key={href}
               href={href}
-              className={`border-b-2 pb-1 transition-colors ${
-                active
-                  ? "border-orange-500 text-white"
-                  : "border-transparent text-zinc-300"
-              }`}
+              className={`border-b-2 pb-1 transition-colors ${active
+                ? "border-orange-500 text-white"
+                : "border-transparent text-zinc-300"
+                }`}
             >
               {label}
             </Link>
