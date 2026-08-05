@@ -5,6 +5,7 @@ import {
   Search,
   ShieldCheck,
   Mail,
+  FileText,
   TrendingUp,
   ShieldAlert,
   AlertTriangle,
@@ -42,7 +43,7 @@ type UrlResult = {
     heuristics: string;
   };
 };
-type EmailResult = { riskLevel: string; reason: string };
+type SimpleResult = { riskLevel: string; reason: string };
 
 const chartData = [
   { day: "Mon", threats: 0, scans: 0 },
@@ -61,6 +62,8 @@ const riskColor: Record<string, string> = {
 };
 
 function ScanIcon({ type }: { type: string }) {
+  if (type === "pdf")
+    return <FileText size={16} className="shrink-0 text-primary" />;
   const src = type === "url" ? "/url.svg" : "/email.svg";
   return (
     <div
@@ -87,8 +90,12 @@ export default function Scanner() {
   const [urlLoading, setUrlLoading] = useState(false);
 
   const [emailContent, setEmailContent] = useState("");
-  const [emailResult, setEmailResult] = useState<EmailResult | null>(null);
+  const [emailResult, setEmailResult] = useState<SimpleResult | null>(null);
   const [emailLoading, setEmailLoading] = useState(false);
+
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfResult, setPdfResult] = useState<SimpleResult | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const [stats, setStats] = useState<Stats>({
     scansThisWeek: 0,
@@ -150,6 +157,24 @@ export default function Scanner() {
     loadDashboard();
   }
 
+  async function handleScanPdf() {
+    if (!pdfFile) return;
+    setPdfLoading(true);
+    setPdfResult(null);
+    const token = await getToken();
+    const formData = new FormData();
+    formData.append("file", pdfFile);
+    const res = await fetch("http://localhost:5000/api/scan/pdf", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    const data = await res.json();
+    setPdfResult(res.ok ? data : { riskLevel: "low", reason: data.error });
+    setPdfLoading(false);
+    loadDashboard();
+  }
+
   const statCards = [
     {
       icon: TrendingUp,
@@ -182,7 +207,7 @@ export default function Scanner() {
       <Navbar />
 
       <section
-        className="px-8 py-16"
+        className="px-8 py-8"
         style={{
           background:
             "radial-gradient(ellipse 60% 60% at 50% -10%, rgba(249,115,22,0.35), #09090b 70%)",
@@ -297,6 +322,47 @@ export default function Scanner() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {emailResult.reason}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-6">
+              <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <FileText size={16} className="text-primary" />
+                PDF content scanner
+              </div>
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                className="mb-3 w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
+              />
+              <button
+                onClick={handleScanPdf}
+                disabled={pdfLoading || !pdfFile}
+                className="w-full rounded-lg bg-primary px-6 py-3 font-medium text-white disabled:opacity-50"
+              >
+                {pdfLoading ? "Scanning..." : "Scan PDF"}
+              </button>
+              {pdfResult && (
+                <div className="mt-4 rounded-lg border border-border bg-background p-3 text-left">
+                  <p className="text-sm font-semibold">
+                    Risk:{" "}
+                    <span
+                      className={
+                        pdfResult.riskLevel === "high"
+                          ? "text-destructive"
+                          : pdfResult.riskLevel === "medium"
+                            ? "text-warning"
+                            : "text-success"
+                      }
+                    >
+                      {pdfResult.riskLevel.toUpperCase()}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {pdfResult.reason}
                   </p>
                 </div>
               )}
