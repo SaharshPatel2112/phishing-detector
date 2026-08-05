@@ -11,7 +11,7 @@ export async function getKeywords() {
 export async function addKeyword(phrase, weight = 1) {
   const { data, error } = await supabase
     .from("suspicious_keywords")
-    .insert({ phrase, weight })
+    .insert({ phrase: phrase.trim(), weight })
     .select()
     .single();
   if (error) throw error;

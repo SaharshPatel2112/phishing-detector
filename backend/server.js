@@ -16,6 +16,11 @@ import { getDashboardStats, getRecentScans } from "./services/stats.js";
 import { analyzeEmail } from "./services/emailAnalyzer.js";
 import { extractPdfText } from "./services/pdfExtractor.js";
 import { getKeywords, addKeyword, deleteKeyword } from "./services/keywords.js";
+import {
+  getAllUsers,
+  getAllScans,
+  getAdminAnalytics,
+} from "./services/adminData.js";
 import { requireAdmin } from "./middleware/requireAdmin.js";
 import { getCachedUrlScan } from "./services/cache.js";
 import { getReport } from "./services/reports.js";
@@ -125,12 +130,10 @@ app.post(
 
       const text = await extractPdfText(req.file.buffer);
       if (!text.trim()) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Could not extract text from this PDF (it may be a scanned image)",
-          });
+        return res.status(400).json({
+          error:
+            "Could not extract text from this PDF (it may be a scanned image)",
+        });
       }
 
       const analysis = await analyzeEmail(text);
@@ -207,6 +210,24 @@ app.delete(
   async (req, res) => {
     await deleteKeyword(req.params.id);
     res.json({ success: true });
+  },
+);
+
+app.get("/api/admin/users", requireAuth(), requireAdmin, async (req, res) => {
+  res.json(await getAllUsers());
+});
+
+app.get("/api/admin/logs", requireAuth(), requireAdmin, async (req, res) => {
+  const { riskLevel, scanType, days, search } = req.query;
+  res.json(await getAllScans({ riskLevel, scanType, days, search }));
+});
+
+app.get(
+  "/api/admin/analytics",
+  requireAuth(),
+  requireAdmin,
+  async (req, res) => {
+    res.json(await getAdminAnalytics());
   },
 );
 
