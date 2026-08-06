@@ -1,33 +1,29 @@
-const SUSPICIOUS_PHRASES = [
-    "verify your account",
-    "account suspended",
-    "act immediately",
-    "act now",
-    "confirm your password",
-    "click here to verify",
-    "unusual activity detected",
-    "your account will be closed",
-    "update your billing",
-    "urgent action required",
-    "limited time",
-    "confirm your identity",
-    "suspended due to",
-];
+import { supabase } from "../db.js";
 
-export function analyzeEmail(content) {
-    const lower = content.toLowerCase();
-    const matched = SUSPICIOUS_PHRASES.filter((p) => lower.includes(p));
+function normalize(text) {
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
 
-    let level = "low";
-    if (matched.length >= 3) level = "high";
-    else if (matched.length >= 1) level = "medium";
+export async function analyzeEmail(content) {
+  const { data: keywords } = await supabase
+    .from("suspicious_keywords")
+    .select("phrase, weight");
+  const normalizedContent = normalize(content);
+  const matched = (keywords || []).filter((k) =>
+    normalizedContent.includes(normalize(k.phrase)),
+  );
+  const score = matched.reduce((sum, k) => sum + k.weight, 0);
 
-    return {
-        level,
-        matched,
-        reason:
-            matched.length > 0
-                ? `Matched suspicious phrases: ${matched.join(", ")}`
-                : "No suspicious phrases detected",
-    };
+  let level = "low";
+  if (score >= 3) level = "high";
+  else if (score >= 1) level = "medium";
+
+  return {
+    level,
+    matched: matched.map((k) => k.phrase),
+    reason:
+      matched.length > 0
+        ? `Matched suspicious phrases: ${matched.map((k) => k.phrase).join(", ")}`
+        : "No suspicious phrases detected",
+  };
 }

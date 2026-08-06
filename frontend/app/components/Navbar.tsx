@@ -22,6 +22,7 @@ export default function Navbar() {
   const links = [
     { href: "/", label: "Home" },
     { href: "/scanner", label: "Scanner" },
+    { href: "/reports", label: "Reports" },
     ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import multer from "multer";
 import {
   clerkMiddleware,
   requireAuth,
@@ -13,12 +14,24 @@ import { calculateRisk } from "./services/riskScore.js";
 import { getOrCreateUser } from "./services/users.js";
 import { getDashboardStats, getRecentScans } from "./services/stats.js";
 import { analyzeEmail } from "./services/emailAnalyzer.js";
+import { extractPdfText } from "./services/pdfExtractor.js";
 import { getKeywords, addKeyword, deleteKeyword } from "./services/keywords.js";
+import {
+  getAllUsers,
+  getAllScans,
+  getAdminAnalytics,
+} from "./services/adminData.js";
 import { requireAdmin } from "./middleware/requireAdmin.js";
 import { getCachedUrlScan } from "./services/cache.js";
+import { getReport } from "./services/reports.js";
 import { supabase } from "./db.js";
 
 const app = express();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(clerkMiddleware());
@@ -87,7 +100,7 @@ app.post("/api/scan/email", requireAuth(), async (req, res) => {
     await supabase.from("scan_history").insert({
       user_id: user.id,
       scan_type: "email",
-      content: content.slice(0, 500),
+      content: content,
       result: { matched: analysis.matched },
       risk_level: analysis.level,
     });
@@ -98,6 +111,52 @@ app.post("/api/scan/email", requireAuth(), async (req, res) => {
     res.status(500).json({ error: "Analysis failed" });
   }
 });
+
+app.post(
+  "/api/scan/pdf",
+  requireAuth(),
+  upload.single("file"),
+  async (req, res) => {
+    const { userId } = getAuth(req);
+    if (!req.file)
+      return res.status(400).json({ error: "PDF file is required" });
+    if (req.file.mimetype !== "application/pdf")
+      return res.status(400).json({ error: "File must be a PDF" });
+
+    try {
+      const clerkUser = await clerkClient.users.getUser(userId);
+      const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+      const user = await getOrCreateUser(userId, email);
+
+      const text = await extractPdfText(req.file.buffer);
+      if (!text.trim()) {
+        return res.status(400).json({
+          error:
+            "Could not extract text from this PDF (it may be a scanned image)",
+        });
+      }
+
+      const analysis = await analyzeEmail(text);
+
+      await supabase.from("scan_history").insert({
+        user_id: user.id,
+        scan_type: "pdf",
+        content: `[${req.file.originalname}]\n\n${text}`,
+        result: { matched: analysis.matched, filename: req.file.originalname },
+        risk_level: analysis.level,
+      });
+
+      res.json({
+        riskLevel: analysis.level,
+        reason: analysis.reason,
+        filename: req.file.originalname,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "PDF scan failed" });
+    }
+  },
+);
 
 app.get("/api/dashboard/stats", requireAuth(), async (req, res) => {
   const { userId } = getAuth(req);
@@ -113,6 +172,15 @@ app.get("/api/dashboard/recent", requireAuth(), async (req, res) => {
   const email = clerkUser.emailAddresses[0]?.emailAddress || "";
   const user = await getOrCreateUser(userId, email);
   res.json(await getRecentScans(user.id));
+});
+
+app.get("/api/reports", requireAuth(), async (req, res) => {
+  const { userId } = getAuth(req);
+  const clerkUser = await clerkClient.users.getUser(userId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+  const user = await getOrCreateUser(userId, email);
+  const { riskLevel, scanType, days } = req.query;
+  res.json(await getReport(user.id, { riskLevel, scanType, days }));
 });
 
 app.get(
@@ -142,6 +210,24 @@ app.delete(
   async (req, res) => {
     await deleteKeyword(req.params.id);
     res.json({ success: true });
+  },
+);
+
+app.get("/api/admin/users", requireAuth(), requireAdmin, async (req, res) => {
+  res.json(await getAllUsers());
+});
+
+app.get("/api/admin/logs", requireAuth(), requireAdmin, async (req, res) => {
+  const { riskLevel, scanType, days, search } = req.query;
+  res.json(await getAllScans({ riskLevel, scanType, days, search }));
+});
+
+app.get(
+  "/api/admin/analytics",
+  requireAuth(),
+  requireAdmin,
+  async (req, res) => {
+    res.json(await getAdminAnalytics());
   },
 );
 
