@@ -139,7 +139,6 @@ export default function Admin() {
         }}
       >
         <div className="mx-auto max-w-6xl">
-          <span className="text-sm font-semibold text-primary">ADMIN</span>
           <h1 className="mt-2 text-2xl font-bold">Admin dashboard</h1>
 
           {error ? (

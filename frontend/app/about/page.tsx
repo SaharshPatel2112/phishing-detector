@@ -83,7 +83,6 @@ export default function About() {
         }}
       >
         <div className="mx-auto max-w-3xl">
-          <span className="text-sm font-semibold text-primary">ABOUT</span>
           <h1 className="mt-2 text-3xl font-bold">About PhishGuard AI</h1>
           <p className="mt-4 text-muted-foreground">
             PhishGuard AI checks URLs, email content, and PDF attachments for
