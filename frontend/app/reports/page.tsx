@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { X, ShieldCheck, Clock } from "lucide-react";
 import Navbar from "../components/Navbar";
+import { API_URL } from "../../lib/api";
 
 type Scan = {
   id: string;
@@ -178,7 +179,7 @@ export default function Reports() {
   async function loadReport() {
     const token = await getToken();
     const params = new URLSearchParams({ riskLevel, scanType, days });
-    const res = await fetch(`http://localhost:5000/api/reports?${params}`, {
+    const res = await fetch(`${API_URL}/api/reports?${params}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     setReport(await res.json());

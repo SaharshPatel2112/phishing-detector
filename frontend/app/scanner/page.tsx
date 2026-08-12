@@ -21,6 +21,7 @@ import {
   YAxis,
 } from "recharts";
 import Navbar from "../components/Navbar";
+import { API_URL } from "../../lib/api";
 
 type Stats = {
   scansThisWeek: number;
@@ -108,18 +109,13 @@ export default function Scanner() {
   async function loadDashboard() {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
-    const statsRes = await fetch("http://localhost:5000/api/dashboard/stats", {
-      headers,
-    });
+    const statsRes = await fetch(`${API_URL}/api/dashboard/stats`, { headers });
     setStats(await statsRes.json());
-    const recentRes = await fetch(
-      "http://localhost:5000/api/dashboard/recent",
-      { headers },
-    );
-    setRecentScans(await recentRes.json());
-    const chartRes = await fetch("http://localhost:5000/api/dashboard/chart", {
+    const recentRes = await fetch(`${API_URL}/api/dashboard/recent`, {
       headers,
     });
+    setRecentScans(await recentRes.json());
+    const chartRes = await fetch(`${API_URL}/api/dashboard/chart`, { headers });
     setChartData(await chartRes.json());
   }
 
@@ -132,7 +128,7 @@ export default function Scanner() {
     setUrlResult(null);
     setUrlError("");
     const token = await getToken();
-    const res = await fetch("http://localhost:5000/api/scan/url", {
+    const res = await fetch(`${API_URL}/api/scan/url`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -155,7 +151,7 @@ export default function Scanner() {
     setEmailResult(null);
     setEmailError("");
     const token = await getToken();
-    const res = await fetch("http://localhost:5000/api/scan/email", {
+    const res = await fetch(`${API_URL}/api/scan/email`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -180,7 +176,7 @@ export default function Scanner() {
     const token = await getToken();
     const formData = new FormData();
     formData.append("file", pdfFile);
-    const res = await fetch("http://localhost:5000/api/scan/pdf", {
+    const res = await fetch(`${API_URL}/api/scan/pdf`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: formData,

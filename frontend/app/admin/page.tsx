@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { KeyRound, Trash2, Users, FileText, Search } from "lucide-react";
 import Navbar from "../components/Navbar";
+import { API_URL } from "../../lib/api";
 
 type Keyword = { id: string; phrase: string; weight: number };
 type AdminUser = {
@@ -57,7 +58,7 @@ export default function Admin() {
 
   async function authedFetch(path: string) {
     const token = await getToken();
-    const res = await fetch(`http://localhost:5000${path}`, {
+    const res = await fetch(`${API_URL}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.status === 403) {
@@ -106,7 +107,7 @@ export default function Admin() {
   async function handleAddKeyword() {
     if (!phrase) return;
     const token = await getToken();
-    await fetch("http://localhost:5000/api/admin/keywords", {
+    await fetch(`${API_URL}/api/admin/keywords`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -120,7 +121,7 @@ export default function Admin() {
 
   async function handleDeleteKeyword(id: string) {
     const token = await getToken();
-    await fetch(`http://localhost:5000/api/admin/keywords/${id}`, {
+    await fetch(`${API_URL}/api/admin/keywords/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
