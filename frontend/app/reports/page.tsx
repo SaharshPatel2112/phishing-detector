@@ -203,7 +203,7 @@ export default function Reports() {
             "radial-gradient(ellipse 60% 60% at 50% -10%, rgba(249,115,22,0.35), #09090b 70%)",
         }}
       >
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-6xl">
           <h1 className="text-2xl font-bold">Your threat report</h1>
 
           <div className="mt-6 flex flex-wrap gap-3">

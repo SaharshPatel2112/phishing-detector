@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import multer from "multer";
 import {
   clerkMiddleware,
@@ -13,6 +15,7 @@ import { checkVirusTotal } from "./services/virusTotal.js";
 import { calculateRisk } from "./services/riskScore.js";
 import { getOrCreateUser } from "./services/users.js";
 import { getDashboardStats, getRecentScans } from "./services/stats.js";
+import { getDetectionsOverTime } from "./services/chart.js";
 import { analyzeEmail } from "./services/emailAnalyzer.js";
 import { extractPdfText } from "./services/pdfExtractor.js";
 import { getKeywords, addKeyword, deleteKeyword } from "./services/keywords.js";
@@ -32,14 +35,36 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-app.use(cors());
-app.use(express.json());
+app.use(helmet());
+app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }));
+app.use(express.json({ limit: "2mb" }));
 app.use(clerkMiddleware());
 
-app.post("/api/scan/url", requireAuth(), async (req, res) => {
+const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
+app.use(generalLimiter);
+
+const scanLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: "Too many scan requests. Wait a minute and try again." },
+});
+
+function isValidUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+app.post("/api/scan/url", scanLimiter, requireAuth(), async (req, res) => {
   const { url } = req.body;
   const { userId } = getAuth(req);
-  if (!url) return res.status(400).json({ error: "URL is required" });
+  if (!url || typeof url !== "string")
+    return res.status(400).json({ error: "URL is required" });
+  if (!isValidUrl(url))
+    return res.status(400).json({ error: "Not a valid http/https URL" });
 
   try {
     const clerkUser = await clerkClient.users.getUser(userId);
@@ -68,13 +93,14 @@ app.post("/api/scan/url", requireAuth(), async (req, res) => {
       user_id: user.id,
       scan_type: "url",
       content: url,
-      result: { gsbResult, vtResult },
+      result: { gsbResult, vtResult, score: risk.score },
       risk_level: risk.level,
     });
 
     res.json({
       url,
       riskLevel: risk.level,
+      score: risk.score,
       reason: fromCache ? `${risk.reason} (cached result)` : risk.reason,
       sources: risk.sources,
     });
@@ -84,11 +110,17 @@ app.post("/api/scan/url", requireAuth(), async (req, res) => {
   }
 });
 
-app.post("/api/scan/email", requireAuth(), async (req, res) => {
+app.post("/api/scan/email", scanLimiter, requireAuth(), async (req, res) => {
   const { content } = req.body;
   const { userId } = getAuth(req);
-  if (!content)
+  if (!content || typeof content !== "string" || !content.trim()) {
     return res.status(400).json({ error: "Email content is required" });
+  }
+  if (content.length > 20000) {
+    return res
+      .status(400)
+      .json({ error: "Email content too long (max 20,000 characters)" });
+  }
 
   try {
     const clerkUser = await clerkClient.users.getUser(userId);
@@ -114,6 +146,7 @@ app.post("/api/scan/email", requireAuth(), async (req, res) => {
 
 app.post(
   "/api/scan/pdf",
+  scanLimiter,
   requireAuth(),
   upload.single("file"),
   async (req, res) => {
@@ -130,10 +163,12 @@ app.post(
 
       const text = await extractPdfText(req.file.buffer);
       if (!text.trim()) {
-        return res.status(400).json({
-          error:
-            "Could not extract text from this PDF (it may be a scanned image)",
-        });
+        return res
+          .status(400)
+          .json({
+            error:
+              "Could not extract text from this PDF (it may be a scanned image)",
+          });
       }
 
       const analysis = await analyzeEmail(text);
@@ -174,6 +209,14 @@ app.get("/api/dashboard/recent", requireAuth(), async (req, res) => {
   res.json(await getRecentScans(user.id));
 });
 
+app.get("/api/dashboard/chart", requireAuth(), async (req, res) => {
+  const { userId } = getAuth(req);
+  const clerkUser = await clerkClient.users.getUser(userId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+  const user = await getOrCreateUser(userId, email);
+  res.json(await getDetectionsOverTime(user.id));
+});
+
 app.get("/api/reports", requireAuth(), async (req, res) => {
   const { userId } = getAuth(req);
   const clerkUser = await clerkClient.users.getUser(userId);
@@ -198,7 +241,9 @@ app.post(
   requireAdmin,
   async (req, res) => {
     const { phrase, weight } = req.body;
-    if (!phrase) return res.status(400).json({ error: "Phrase is required" });
+    if (!phrase || typeof phrase !== "string" || !phrase.trim()) {
+      return res.status(400).json({ error: "Phrase is required" });
+    }
     res.json(await addKeyword(phrase, weight || 1));
   },
 );

@@ -1,5 +1,17 @@
 import { checkUrlHeuristics } from "./urlHeuristics.js";
 
+function calculateScore(level, gsbResult, vtResult, heuristicFlags) {
+  const raw =
+    (gsbResult.flagged ? 40 : 0) +
+    (vtResult.malicious || 0) * 6 +
+    (vtResult.suspicious || 0) * 3 +
+    heuristicFlags.length * 4;
+
+  if (level === "high") return Math.min(71 + raw, 100);
+  if (level === "medium") return Math.min(30 + raw, 70);
+  return Math.min(raw, 29);
+}
+
 export function calculateRisk(gsbResult, vtResult, url) {
   const heuristicFlags = checkUrlHeuristics(url);
   let level, reason;
@@ -24,8 +36,11 @@ export function calculateRisk(gsbResult, vtResult, url) {
     reason = "No threats detected";
   }
 
+  const score = calculateScore(level, gsbResult, vtResult, heuristicFlags);
+
   return {
     level,
+    score,
     reason,
     sources: {
       googleSafeBrowsing: gsbResult.flagged ? "flagged" : "clean",

@@ -34,8 +34,10 @@ type Scan = {
   risk_level: string;
   created_at: string;
 };
+type ChartPoint = { day: string; scans: number; threats: number };
 type UrlResult = {
   riskLevel: string;
+  score: number;
   reason: string;
   sources?: {
     googleSafeBrowsing: string;
@@ -45,21 +47,16 @@ type UrlResult = {
 };
 type SimpleResult = { riskLevel: string; reason: string };
 
-const chartData = [
-  { day: "Mon", threats: 0, scans: 0 },
-  { day: "Tue", threats: 0, scans: 0 },
-  { day: "Wed", threats: 0, scans: 0 },
-  { day: "Thu", threats: 0, scans: 0 },
-  { day: "Fri", threats: 0, scans: 0 },
-  { day: "Sat", threats: 0, scans: 0 },
-  { day: "Sun", threats: 0, scans: 0 },
-];
-
 const riskColor: Record<string, string> = {
   high: "text-destructive bg-destructive/10 border-destructive/30",
   medium: "text-warning bg-warning/10 border-warning/30",
   low: "text-success bg-success/10 border-success/30",
 };
+
+function scoreColor(score: number) {
+  const hue = 120 - (score / 100) * 120;
+  return `hsl(${hue}, 85%, 50%)`;
+}
 
 function ScanIcon({ type }: { type: string }) {
   if (type === "pdf")
@@ -87,10 +84,12 @@ export default function Scanner() {
 
   const [url, setUrl] = useState("");
   const [urlResult, setUrlResult] = useState<UrlResult | null>(null);
+  const [urlError, setUrlError] = useState("");
   const [urlLoading, setUrlLoading] = useState(false);
 
   const [emailContent, setEmailContent] = useState("");
   const [emailResult, setEmailResult] = useState<SimpleResult | null>(null);
+  const [emailError, setEmailError] = useState("");
   const [emailLoading, setEmailLoading] = useState(false);
 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -104,6 +103,7 @@ export default function Scanner() {
     markedSafe: 0,
   });
   const [recentScans, setRecentScans] = useState<Scan[]>([]);
+  const [chartData, setChartData] = useState<ChartPoint[]>([]);
 
   async function loadDashboard() {
     const token = await getToken();
@@ -117,6 +117,10 @@ export default function Scanner() {
       { headers },
     );
     setRecentScans(await recentRes.json());
+    const chartRes = await fetch("http://localhost:5000/api/dashboard/chart", {
+      headers,
+    });
+    setChartData(await chartRes.json());
   }
 
   useEffect(() => {
@@ -126,6 +130,7 @@ export default function Scanner() {
   async function handleScanUrl() {
     setUrlLoading(true);
     setUrlResult(null);
+    setUrlError("");
     const token = await getToken();
     const res = await fetch("http://localhost:5000/api/scan/url", {
       method: "POST",
@@ -135,7 +140,12 @@ export default function Scanner() {
       },
       body: JSON.stringify({ url }),
     });
-    setUrlResult(await res.json());
+    const data = await res.json();
+    if (res.ok) {
+      setUrlResult(data);
+    } else {
+      setUrlError(data.error || "Scan failed");
+    }
     setUrlLoading(false);
     loadDashboard();
   }
@@ -143,6 +153,7 @@ export default function Scanner() {
   async function handleAnalyzeEmail() {
     setEmailLoading(true);
     setEmailResult(null);
+    setEmailError("");
     const token = await getToken();
     const res = await fetch("http://localhost:5000/api/scan/email", {
       method: "POST",
@@ -152,7 +163,12 @@ export default function Scanner() {
       },
       body: JSON.stringify({ content: emailContent }),
     });
-    setEmailResult(await res.json());
+    const data = await res.json();
+    if (res.ok) {
+      setEmailResult(data);
+    } else {
+      setEmailError(data.error || "Analysis failed");
+    }
     setEmailLoading(false);
     loadDashboard();
   }
@@ -207,13 +223,13 @@ export default function Scanner() {
       <Navbar />
 
       <section
-        className="px-8 py-8"
+        className="px-8 py-6"
         style={{
           background:
             "radial-gradient(ellipse 60% 60% at 50% -10%, rgba(249,115,22,0.35), #09090b 70%)",
         }}
       >
-        <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-6 lg:grid-cols-5">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-5">
           <div className="flex flex-col gap-6 lg:col-span-2">
             <div className="rounded-2xl border border-border bg-card p-6">
               <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
@@ -240,23 +256,39 @@ export default function Scanner() {
               >
                 {urlLoading ? "Scanning..." : "Scan URL"}
               </button>
+              {urlError && (
+                <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  {urlError}
+                </div>
+              )}
               {urlResult && (
                 <div className="mt-4 rounded-lg border border-border bg-background p-3 text-left">
-                  <p className="text-sm font-semibold">
-                    Risk:{" "}
-                    <span
-                      className={
-                        urlResult.riskLevel === "high"
-                          ? "text-destructive"
-                          : urlResult.riskLevel === "medium"
-                            ? "text-warning"
-                            : "text-success"
-                      }
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">
+                      Risk:{" "}
+                      <span
+                        className={
+                          urlResult.riskLevel === "high"
+                            ? "text-destructive"
+                            : urlResult.riskLevel === "medium"
+                              ? "text-warning"
+                              : "text-success"
+                        }
+                      >
+                        {urlResult.riskLevel.toUpperCase()}
+                      </span>
+                    </p>
+                    <p
+                      className="text-2xl font-bold"
+                      style={{ color: scoreColor(urlResult.score) }}
                     >
-                      {urlResult.riskLevel.toUpperCase()}
-                    </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
+                      {urlResult.score}
+                      <span className="text-xs text-muted-foreground">
+                        /100
+                      </span>
+                    </p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {urlResult.reason}
                   </p>
                   {urlResult.sources && (
@@ -304,6 +336,11 @@ export default function Scanner() {
               >
                 {emailLoading ? "Analyzing..." : "Analyze Email"}
               </button>
+              {emailError && (
+                <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                  {emailError}
+                </div>
+              )}
               {emailResult && (
                 <div className="mt-4 rounded-lg border border-border bg-background p-3 text-left">
                   <p className="text-sm font-semibold">
@@ -434,6 +471,7 @@ export default function Scanner() {
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
+                      allowDecimals={false}
                     />
                     <Tooltip
                       contentStyle={{
