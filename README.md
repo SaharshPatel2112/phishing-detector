@@ -1,7 +1,8 @@
 # 🛡️ PhishGuard AI
 
 A rule-based phishing detection platform that scans URLs, email content, and PDF attachments for signs of phishing — and gives you a clear, scored view of the threat.
-
+- **Frontend link** — https://phishing-detector-nine-gamma.vercel.app
+- **Backend Link** — https://phishing-detector-0is4.onrender.com
 
 ---
 
@@ -250,7 +251,6 @@ create table suspicious_keywords (
 );
 ```
 
-Admin access is granted by matching your Clerk email against an allowlist in `backend/config/admin.js` — update that file with your own email before running locally.
 
 ---
 
